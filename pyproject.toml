@@ -9,7 +9,7 @@ description = "Sync metrics and fact tables to GrowthBook"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [
-    { name = "Joyn", email = "dev@joyn.de" }
+    { name = "Nilabhra Patra", email = "nlbhrptr@hotmail.com" }
 ]
 requires-python = ">=3.12"
 dependencies = [
