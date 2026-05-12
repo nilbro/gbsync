@@ -1,0 +1,43 @@
+# gbsync Configuration Example
+# Update datasource IDs, SQL paths, and user ID types for your setup
+
+factTables:
+  - id: fact_table_events
+    data:
+      name: events
+      # Find datasource ID in GrowthBook UI → Data Sources
+      datasource: ds_YOUR_DATASOURCE_ID
+      userIdTypes: [user_id]
+      sql: !include fact_tables/events.sql
+
+  - id: fact_table_conversions
+    data:
+      name: conversions
+      datasource: ds_YOUR_DATASOURCE_ID
+      userIdTypes: [user_id]
+      sql: !include fact_tables/conversions.sql
+
+factFilters:
+  - id: filter_production
+    data:
+      name: Production Events
+      value: "environment = 'production'"
+
+factMetrics:
+  - id: metric_conversion_rate
+    data:
+      name: Conversion Rate
+      metricType: ratio
+      numerator:
+        factTableId: fact_table_conversions
+        column: converted
+      denominator:
+        factTableId: fact_table_events
+        column: total_events
+
+  - id: metric_avg_events_per_user
+    data:
+      name: Avg Events per User
+      metricType: mean
+      factTableId: fact_table_events
+      column: total_events
