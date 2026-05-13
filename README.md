@@ -1,22 +1,23 @@
 # gbsync
 
-Sync metrics and fact tables to GrowthBook using a version-controlled YAML configuration. gbsync manages your experiment infrastructure as code, enabling reproducible deployments and safe collaboration.
+Sync artifacts to GrowthBook using a version-controlled YAML configuration. gbsync manages your experiment infrastructure as code, enabling reproducible deployments and safe collaboration.
+
+Currently supports:
+* Fact Tables
+* Fact Table Filters
+* Fact Metrics
+* Environments
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ## Features
 
-- **Infrastructure as Code**: Define metrics and fact tables in YAML
+- **Infrastructure as Code**: Define growthbook artifacts in YAML so that it can be version controlled
 - **Dry-Run Planning**: See what will change before applying
 - **Safe Syncing**: Automatic conflict detection and validation
 - **API-Managed Resources**: Mark resources to prevent manual UI edits
-- **Reusable Filters**: Define WHERE clause conditions once, use many times
-- **Multiple Metric Types**: Support for ratio, proportion, mean, quantile, and more
 - **External File Includes**: Organize SQL in separate files
-- **Template Support**: Preserve GrowthBook template variables
-- **Comprehensive Validation**: Catch configuration errors early
-- **Detailed Error Messages**: Clear guidance on what went wrong
 
 ## Installation
 
@@ -267,25 +268,6 @@ factMetrics:
 
 See [docs/CONFIG.md](docs/CONFIG.md) for complete schema reference.
 
-## How It Works
-
-### Sync Process
-
-1. **Read Config**: Parse YAML configuration file
-2. **Fetch State**: Get current resources from GrowthBook API
-3. **Compare**: Detect differences (creates, updates, deletes)
-4. **Display Plan**: Show user what will change
-5. **Confirm**: Ask for approval (unless --auto-approve)
-6. **Apply**: Create/update/delete resources via API
-7. **Verify**: Confirm changes were applied
-
-### Change Detection
-
-gbsync detects:
-- **Creates**: Resources in config but not in GrowthBook
-- **Updates**: Resources with changed properties
-- **Deletes**: Resources in GrowthBook but not in config (only if `managedBy: "api"`)
-
 **API-Managed Resources:**
 
 Mark resources with `managedBy: api` to allow deletion:
@@ -314,94 +296,6 @@ sql: |
 ```
 
 These variables are preserved during config rendering and evaluated at runtime by GrowthBook.
-
-## Example Workflow
-
-### Step 1: Create Configuration
-
-`gbsync.yaml`:
-```yaml
-factTables:
-  - id: fact_page_views
-    data:
-      name: Page Views
-      datasource: ds_19g624mf5exof1
-      userIdTypes: [user_id]
-      sql: !include fact_tables/page_views.sql
-
-factTableFilters:
-  - id: filter_paid
-    factTableId: fact_page_views
-    data:
-      name: Paid Traffic
-      value: "traffic_source = 'paid'"
-
-factMetrics:
-  - id: metric_paid_conversion_rate
-    data:
-      name: Paid Conversion Rate
-      metricType: ratio
-      numerator:
-        factTableId: fact_page_views
-        column: converted
-        filters: [filter_paid]
-      denominator:
-        factTableId: fact_page_views
-        column: null
-        filters: [filter_paid]
-```
-
-`fact_tables/page_views.sql`:
-```sql
-SELECT
-  user_id,
-  converted,
-  traffic_source
-FROM events
-WHERE event_date >= '{{ startDate }}'
-  AND event_date < '{{ endDate }}'
-```
-
-### Step 2: Preview Changes
-
-```bash
-$ gbsync plan
-
-GrowthBook: Planning changes...
-
-Fact Tables:
-  ✓ Create: Page Views
-
-Fact Filters:
-  ✓ Create: Paid Traffic
-
-Fact Metrics:
-  ✓ Create: Paid Conversion Rate
-
-Ready to apply 3 changes
-```
-
-### Step 3: Apply Changes
-
-```bash
-$ gbsync apply
-
-GrowthBook: Planning changes...
-
-Fact Tables:
-  ✓ Create: Page Views
-
-Fact Filters:
-  ✓ Create: Paid Traffic
-
-Fact Metrics:
-  ✓ Create: Paid Conversion Rate
-
-Ready to apply 3 changes
-Proceed with apply? [y/N]: y
-
-✓ Applied successfully
-```
 
 ### Step 4: Verify in GrowthBook
 
@@ -438,49 +332,6 @@ factTables:
     data:
       name: Conversions
       sql: !include fact_tables/conversions.sql
-```
-
-### Complex Metrics
-
-Support for advanced metric features:
-
-```yaml
-factMetrics:
-  - id: metric_capped_revenue
-    data:
-      name: Capped Revenue
-      metricType: mean
-      numerator:
-        factTableId: fact_transactions
-        column: revenue
-      cappingSettings:
-        type: percentile
-        value: 0.99
-      regressionAdjustmentSettings:
-        enabled: true  # CUPED
-      windowSettings:
-        type: trailing
-        value: 7
-```
-
-### Dry-Run for CI/CD
-
-Use in continuous integration to validate configs:
-
-```bash
-#!/bin/bash
-set -e
-
-export GB_API_KEY="${GROWTHBOOK_API_KEY}"
-export GB_API_URL="${GROWTHBOOK_API_URL}"
-
-# Validate config
-gbsync plan
-
-# Only apply if not a pull request
-if [ "${CI_COMMIT_BRANCH}" = "main" ]; then
-  gbsync apply --auto-approve
-fi
 ```
 
 ## Documentation
@@ -520,105 +371,9 @@ fi
 - **GrowthBook Docs**: https://docs.growthbook.io/
 - **GrowthBook Community**: https://join.slack.com/t/growthbook-community/
 
-## Common Tasks
-
-### Adding a New Metric
-
-1. Create fact table (if needed):
-```yaml
-factTables:
-  - id: fact_my_table
-    data:
-      name: My Table
-      datasource: ds_123
-      userIdTypes: [user_id]
-      sql: SELECT ...
-```
-
-2. Add metric:
-```yaml
-factMetrics:
-  - id: metric_my_metric
-    data:
-      name: My Metric
-      metricType: ratio
-      numerator:
-        factTableId: fact_my_table
-        column: col_name
-      denominator:
-        factTableId: fact_my_table
-        column: null
-```
-
-3. Plan and apply:
-```bash
-gbsync plan
-gbsync apply
-```
-
-### Updating an Existing Metric
-
-1. Modify config:
-```yaml
-factMetrics:
-  - id: metric_my_metric
-    data:
-      name: My Metric (Updated)
-      description: New description
-```
-
-2. Plan and apply:
-```bash
-gbsync plan
-gbsync apply
-```
-
-### Deleting a Metric
-
-Remove from config and apply:
-```bash
-# Remove metric entry from gbsync.yaml
-gbsync plan
-gbsync apply
-```
-
-Note: Only deletes resources marked `managedBy: api`.
-
-## Troubleshooting
-
-**Q: I see hundreds of changes on first run**
-
-A: This is normal for existing workspaces. Review carefully before applying.
-
-**Q: My API key isn't working**
-
-A: Verify key format (starts with `sdk-`) and check permissions in GrowthBook Settings.
-
-**Q: SQL validation failed**
-
-A: Test your SQL directly in your data warehouse first, then add to config.
-
-**Q: Too many API requests**
-
-A: Use fewer resources per config, batch changes together.
-
-See [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for more solutions.
-
 ## License
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE) file for details.
-
-## Contributing
-
-Contributions are welcome! See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for guidelines.
-
-## Support
-
-For questions or issues:
-1. Check [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
-2. Review [examples/](examples/)
-3. Search [GitHub Issues](https://github.com/growthbook/gbsync/issues)
-4. Create a new issue with details
 
 ## Changelog
 
