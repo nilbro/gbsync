@@ -22,7 +22,7 @@ dependencies = [
     "growthbook>=1.4.9",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "ruff>=0.1.0",
     "black>=23.0",
