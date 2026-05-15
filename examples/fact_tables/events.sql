@@ -9,6 +9,5 @@ SELECT
   CASE WHEN event_type = 'purchase' THEN 1 ELSE 0 END AS conversions,
   properties
 FROM raw_events
-WHERE event_date >= DATE('{{ startDate }}')
-  AND event_date <= DATE('{{ endDate }}')
+WHERE event_date >= DATEADD(day, -90, CURRENT_DATE)
   AND event_type IN ('pageview', 'click', 'purchase')
