@@ -1,13 +1,33 @@
-# gbsync Configuration Example
-# Update datasource IDs, SQL paths, and user ID types for your setup
+# gbsync configuration reference
+# Replace ds_YOUR_DATASOURCE_ID, SQL paths, and userIdTypes for your setup.
+#
+# Top-level sections (all optional):
+#   projects, environments, factTables, factTableFilters, factMetrics
+#
+# Template variables like {{ startDate }}, {{ endDate }}, {{ experimentId }}
+# inside SQL are preserved during sync and evaluated by GrowthBook at runtime.
+
+# A project comes with a "production" environment by default.
+projects:
+  - name: Analytics
+    description: Analytics project
+
+environments:
+  - id: dev
+    data:
+      description: Development environment
+  - id: production  # cannot be deleted, only updated
+    data:
+      description: Production environment
 
 factTables:
   - id: fact_table_events
     data:
       name: events
-      # Find datasource ID in GrowthBook UI → Data Sources
+      # Find datasource ID in GrowthBook UI -> Data Sources
       datasource: ds_YOUR_DATASOURCE_ID
       userIdTypes: [user_id]
+      tags: [events]
       sql: !include fact_tables/events.sql
 
   - id: fact_table_conversions
@@ -15,18 +35,22 @@ factTables:
       name: conversions
       datasource: ds_YOUR_DATASOURCE_ID
       userIdTypes: [user_id]
+      tags: [conversions]
       sql: !include fact_tables/conversions.sql
 
-factFilters:
-  - id: filter_production
+factTableFilters:
+  - factTableId: fact_table_events
+    id: filter_production
     data:
-      name: Production Events
-      value: "environment = 'production'"
+      name: production_events
+      value: environment = 'production'
 
 factMetrics:
+  # ratio: numerator / denominator
   - id: metric_conversion_rate
     data:
       name: Conversion Rate
+      tags: [conversions]
       metricType: ratio
       numerator:
         factTableId: fact_table_conversions
@@ -34,10 +58,37 @@ factMetrics:
       denominator:
         factTableId: fact_table_events
         column: total_events
+        filters: [filter_production]
+      displayAsPercentage: true
 
+  # proportion: numerator / total rows in fact table.
+  # Use $$count for "count rows" semantics.
+  - id: metric_purchaser_rate
+    data:
+      name: Purchaser Rate
+      metricType: proportion
+      numerator:
+        factTableId: fact_table_events
+        column: $$count
+        filters: [filter_production]
+
+  # mean: average of a column.
   - id: metric_avg_events_per_user
     data:
       name: Avg Events per User
       metricType: mean
-      factTableId: fact_table_events
-      column: total_events
+      numerator:
+        factTableId: fact_table_events
+        column: total_events
+
+  # dailyParticipation: average % of days a user is active after exposure.
+  # Other metricType: quantile.
+  - id: metric_daily_participation
+    data:
+      name: Daily Participation
+      metricType: dailyParticipation
+      description: Average % of days a user is active after experiment exposure.
+      numerator:
+        factTableId: fact_table_events
+        column: "$$count"
+      displayAsPercentage: true

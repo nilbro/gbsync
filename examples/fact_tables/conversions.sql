@@ -8,5 +8,6 @@ SELECT
   revenue,
   product_category
 FROM purchases
-WHERE conversion_date >= DATEADD(day, -90, CURRENT_DATE)
+WHERE conversion_date >= DATE('{{ startDate }}')
+  AND conversion_date <= DATE('{{ endDate }}')
   AND status IN ('completed', 'pending', 'failed')
